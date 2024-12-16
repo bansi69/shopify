@@ -1,0 +1,233 @@
+
+import 'package:flutter/material.dart';
+import 'package:timezone/data/latest.dart' as tz;
+
+import 'notification/notification.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
+  tz.initializeTimeZones();
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: "Local Notification",
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const Home(),
+    );
+  }
+}
+
+class Home extends StatefulWidget {
+  const Home({super.key});
+
+  @override
+  State<Home> createState() => _HomeState();
+}
+
+class _HomeState extends State<Home> {
+  static int _notificationIdCounter = 0;
+  final TextEditingController titleController = TextEditingController();
+  final TextEditingController bodyController = TextEditingController();
+  final TextEditingController timeController = TextEditingController();
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    bodyController.dispose();
+    timeController.dispose();
+    super.dispose();
+  }
+
+  void scheduleNotification() {
+    final String title = titleController.text;
+    final String body = bodyController.text;
+    final int? seconds = int.tryParse(timeController.text);
+
+    if (title.isNotEmpty && body.isNotEmpty && seconds != null) {
+      final DateTime scheduledDate = DateTime.now().add(Duration(seconds: seconds));
+
+      // final int id = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+      final int id = _notificationIdCounter++;
+
+      NotificationService.scheduleNotification(
+        id,
+        title,
+        body,
+        scheduledDate,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter valid title, body, and time in seconds")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Local Notification")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            TextField(
+              controller: bodyController,
+              decoration: const InputDecoration(labelText: 'Body'),
+              maxLines: 3,
+            ),
+            TextField(
+              controller: timeController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Time (Seconds)'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: scheduleNotification,
+              child: const Text("Schedule Notification"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// 135 notification set one time
+
+import 'package:flutter/material.dart';
+import 'notification/notification.dart';
+// import 'notification_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize();
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: NotificationSpamTest(),
+    );
+  }
+}
+
+class NotificationSpamTest extends StatelessWidget {
+  const NotificationSpamTest({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Notification Spam Test')),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () async {
+            for (int i = 0; i < 135; i++) {
+              NotificationService.showNotification(
+                i,
+                'Notification #$i',
+                'This is notification in the spam test.',
+              );
+
+              await Future.delayed(const Duration(milliseconds: 200));
+            }
+          },
+          child: const Text('Spam Notifications'),
+        ),
+      ),
+    );
+  }
+}
+
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+class NotificationService {
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  static Future<void> initialize() async {
+    // Request Android 13+ specific notification permissions
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+
+    // iOS-specific permissions
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings iosSettings =
+        DarwinInitializationSettings(
+      requestSoundPermission: true,
+      requestBadgePermission: true,
+      requestAlertPermission: true,
+    );
+
+    const InitializationSettings settings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _notificationsPlugin.initialize(settings);
+  }
+
+  static Future<void> showNotification(
+      int id, String title, String body) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'spam_channel',
+      'Spam Notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+      sound: RawResourceAndroidNotificationSound('ka_ching'),
+    );
+
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      sound: 'ka_ching.mp3',
+      presentBadge: true,
+      presentSound: true,
+      presentAlert: true,
+      presentBanner: true,
+    );
+
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _notificationsPlugin.show(
+      id,
+      title,
+      body,
+      notificationDetails,
+    );
+  }
+}
