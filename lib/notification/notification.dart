@@ -83,7 +83,7 @@ class NotificationService {
     );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-      sound: 'shopify_sale_sound',
+      sound: 'ka_ching.aiff',
     );
 
     const NotificationDetails notificationDetails = NotificationDetails(
